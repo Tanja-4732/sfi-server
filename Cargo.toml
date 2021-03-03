@@ -1,0 +1,16 @@
+[package]
+name = "sfi-server"
+version = "0.0.0"
+authors = ["Bernd-L <git@bernd.pw>"]
+edition = "2018"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Bernd-L/sfi-server"
+homepage = "https://github.com/Bernd-L/sfi-server#readme"
+readme = "README.md"
+documentation = "https://docs.rs/sfi-server"
+description = "Manage shared food inventories (backend server)"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
