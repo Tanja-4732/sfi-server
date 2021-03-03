@@ -14,3 +14,20 @@ description = "Manage shared food inventories (backend server)"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# Core libs
+sfi-core = "0"
+libocc = "0.4"
+
+# Actix
+actix-web = "3"
+actix-files = "0.5.0"
+
+# Serde
+serde = "1"
+serde_derive = "1"
+serde_json = "1"
+
+# Other dependencies
+chrono = "0.4"
+uuid = { version = "0.8", features = ["serde", "v4"] }
+anyhow = "1.0.38"
