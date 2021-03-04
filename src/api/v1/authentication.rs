@@ -109,6 +109,28 @@ mod test {
     }
 
     #[test]
+    fn test_validate_login_accept_no_totp() {
+        let totp_secret = create_secret!();
+
+        // The credentials to attempt authentication with
+        let credentials = UserLogin {
+            uuid: Uuid::from_str(USER_UUID).unwrap(),
+            password: SUPER_SECRET_PASSWORD.to_owned(),
+            totp: None,
+        };
+
+        // The user data stored on the server to validate against
+        let user = UserData {
+            uuid: Uuid::from_str(USER_UUID).unwrap(),
+            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD),
+            totp_secret: None,
+        };
+
+        // This login should work
+        assert!(validate_login(&credentials, &user));
+    }
+
+    #[test]
     fn test_validate_login_wrong_password() {
         let totp_secret = create_secret!();
 
