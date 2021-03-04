@@ -1,7 +1,8 @@
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
-pub fn build() -> actix_web::Scope {
-    web::scope("/").service(hello_api)
+pub fn config(cfg: &mut web::ServiceConfig) {
+    // Serve the static files of the frontend
+    cfg.service(hello_api);
 }
 
 #[get("")]

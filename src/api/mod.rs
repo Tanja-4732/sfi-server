@@ -5,8 +5,7 @@ use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use serde::Serialize;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/v1").service(v1::build()))
-        .route("/", web::get().to(api_info))
+    cfg.service(web::scope("/v1").configure(v1::config))
         .route("", web::get().to(api_info));
 }
 
