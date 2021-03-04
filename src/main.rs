@@ -17,7 +17,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
             // Mount the API
-            .service(api::mount())
+            .service(web::scope("/api").configure(api::config))
             // Serve the static files of the frontend
             .service(Files::new("/", "../sfi-web/public/").index_file("index.html"))
             // Serve the index.html file on 404 (handle in the frontend itself)

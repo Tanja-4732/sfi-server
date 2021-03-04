@@ -1,3 +1,6 @@
+// Not every constant is used
+#![allow(dead_code)]
+
 // This file contains a license notice, see the full AGPL license in LICENSE.md
 
 use super::meta;

@@ -1,7 +1,7 @@
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
 pub fn build() -> actix_web::Scope {
-    web::scope("/v1").service(hello_api)
+    web::scope("/").service(hello_api)
 }
 
 #[get("")]
