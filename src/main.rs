@@ -1,7 +1,7 @@
 mod api;
 mod constants;
+mod static_files;
 
-use actix_files::{Files, NamedFile};
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Resource, Responder};
 
 #[actix_web::main]
@@ -18,8 +18,8 @@ async fn main() -> std::io::Result<()> {
         App::new()
             // Mount the API
             .service(web::scope("/api").configure(api::config))
-            // Serve the static files of the frontend
-            .service(Files::new("/", "../sfi-web/public/").index_file("index.html"))
+            // Mount the static files server
+            .configure(static_files::config)
             // Serve the index.html file on 404 (handle in the frontend itself)
             .default_service(web::get().to(serve_index))
     })
