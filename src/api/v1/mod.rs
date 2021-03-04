@@ -1,8 +1,9 @@
 //! This is the first version of the sfi-server API
 
-pub mod authentication;
-pub mod authorization;
-pub mod events;
+mod authentication;
+mod authorization;
+mod client_events;
+mod server_events;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
