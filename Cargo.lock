@@ -1545,8 +1545,6 @@ dependencies = [
 [[package]]
 name = "sfi-core"
 version = "0.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45d97a7d9edc0ed64ce028f9f3f2accf73c5a1cfe775a544e2ba0380559761d2"
 
 [[package]]
 name = "sfi-server"
