@@ -1,3 +1,5 @@
+//! This is the first version of the sfi-server API
+
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
