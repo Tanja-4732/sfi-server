@@ -1,12 +1,15 @@
 use super::types::UserData;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{
+    cookie::{Cookie, SameSite},
+    get, post, web, App, HttpResponse, HttpServer, Responder,
+};
 use argonautica::{Hasher, Verifier};
-use google_authenticator::{create_secret, get_code};
-use google_authenticator::{verify_code, GA_AUTH};
-use serde::Deserialize;
+use google_authenticator::GA_AUTH;
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
 use std::{
     str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use uuid::Uuid;
 
@@ -15,6 +18,9 @@ const SUPER_SECRET_PASSWORD: &'static str = "123";
 const USER_UUID: &'static str = "7a7e9c87-d745-4919-8343-9d44cf7de2eb";
 const SECRET_HASH_KEY: &'static str = "sneak 100";
 const TOTP_DISCREPANCY: u64 = 1;
+
+// A JWT should last five years
+const DURATION: u64 = 5 * 365 * 24 * 60 * 60;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Serve the static files of the frontend
@@ -28,7 +34,29 @@ async fn hello_auth() -> impl Responder {
 
 #[post("/login")]
 async fn handle_login(credentials: web::Json<UserLogin>) -> impl Responder {
-    HttpResponse::Ok().body(format!("You are {}", credentials.uuid))
+    // TODO implement some kind of user DB (using libocc)
+    let user = UserData {
+        uuid: credentials.uuid,
+        pwd_salt_hash: make_salted_hash(credentials.password.clone()),
+        totp_secret: None,
+    };
+
+    // Check credentials
+    if validate_login(&credentials, &user) {
+        // Authorize login
+        HttpResponse::Ok()
+            .cookie(
+                Cookie::build("jwt", make_jwt(&user))
+                    .same_site(SameSite::Strict)
+                    .secure(true)
+                    .http_only(true)
+                    .finish(),
+            )
+            .body("Authentication successful")
+    } else {
+        // Deny login
+        HttpResponse::Unauthorized().body("Invalid credentials")
+    }
 }
 
 #[derive(Deserialize)]
@@ -36,6 +64,39 @@ struct UserLogin {
     uuid: Uuid,
     password: String,
     totp: Option<String>,
+}
+
+/// Our claims struct, it needs to derive `Serialize` and/or `Deserialize`
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String,
+    exp: usize,
+    nbf: usize,
+    iat: usize,
+}
+
+fn make_jwt(user: &UserData) -> String {
+    // Get the current time
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Make claims for the new JWT
+    let claims = Claims {
+        sub: user.uuid.to_string(),
+        exp: (now + DURATION) as usize,
+        nbf: now as usize,
+        iat: now as usize,
+    };
+
+    // Encode, sign and return the new token
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret("secret".as_ref()),
+    )
+    .unwrap()
 }
 
 /// Authenticates a user based on credentials
@@ -69,9 +130,9 @@ fn validate_login(credentials: &UserLogin, user: &UserData) -> bool {
 }
 
 /// Generates some nice salt
-fn make_salted_hash(password: &'static str) -> String {
+fn make_salted_hash(password: String) -> String {
     Hasher::new()
-        .with_password(password)
+        .with_password(&password)
         .with_secret_key(SECRET_HASH_KEY)
         .hash()
         .unwrap()
@@ -80,6 +141,8 @@ fn make_salted_hash(password: &'static str) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+    use google_authenticator::{create_secret, get_code};
+    use std::str::FromStr;
 
     #[test]
     fn test_validate_login_accept() {
@@ -105,8 +168,6 @@ mod test {
 
     #[test]
     fn test_validate_login_accept_no_totp() {
-        let totp_secret = create_secret!();
-
         // The credentials to attempt authentication with
         let credentials = UserLogin {
             uuid: Uuid::from_str(USER_UUID).unwrap(),
