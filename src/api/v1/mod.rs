@@ -4,6 +4,7 @@ mod authentication;
 mod authorization;
 mod client_events;
 mod server_events;
+mod types;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 

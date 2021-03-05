@@ -1,3 +1,4 @@
+use super::types::UserData;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use argonautica::{Hasher, Verifier};
 use google_authenticator::{create_secret, get_code};
@@ -35,12 +36,6 @@ struct UserLogin {
     uuid: Uuid,
     password: String,
     totp: Option<String>,
-}
-
-struct UserData {
-    uuid: Uuid,
-    pwd_salt_hash: String,
-    totp_secret: Option<String>,
 }
 
 /// Authenticates a user based on credentials
