@@ -1,4 +1,4 @@
-use super::types::UserData;
+use super::types::User;
 use actix_web::{
     cookie::{Cookie, SameSite},
     get, post, web, App, HttpResponse, HttpServer, Responder,
@@ -36,11 +36,7 @@ async fn hello_auth() -> impl Responder {
 #[post("/login")]
 async fn handle_login(credentials: web::Json<UserLogin>) -> impl Responder {
     // TODO implement some kind of user DB (using libocc)
-    let user = UserData {
-        uuid: credentials.uuid,
-        pwd_salt_hash: make_salted_hash(credentials.password.clone()),
-        totp_secret: None,
-    };
+    let user = User::new("someone".to_owned(), credentials.password.clone());
 
     // Check credentials
     if validate_login(&credentials, &user) {
@@ -78,7 +74,7 @@ struct Claims {
     iat: usize,
 }
 
-fn make_jwt(user: &UserData) -> String {
+fn make_jwt(user: &User) -> String {
     // Get the current time
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -103,7 +99,7 @@ fn make_jwt(user: &UserData) -> String {
 }
 
 /// Authenticates a user based on credentials
-fn validate_login(credentials: &UserLogin, user: &UserData) -> bool {
+fn validate_login(credentials: &UserLogin, user: &User) -> bool {
     // Make sure to authenticate the correct user
     if credentials.uuid != user.uuid {
         return false;
@@ -133,7 +129,7 @@ fn validate_login(credentials: &UserLogin, user: &UserData) -> bool {
 }
 
 /// Generates some nice salt
-fn make_salted_hash(password: String) -> String {
+pub fn make_salted_hash(password: String) -> String {
     Hasher::new()
         .with_password(&password)
         .with_secret_key(SECRET_HASH_KEY)
@@ -151,18 +147,15 @@ mod test {
     fn test_validate_login_accept() {
         let totp_secret = create_secret!();
 
+        // The user data stored on the server to validate against
+        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+        user.totp_secret = Some(totp_secret.clone());
+
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
+            uuid: user.uuid.clone(),
             password: SUPER_SECRET_PASSWORD.to_owned(),
             totp: Some(get_code!(&totp_secret).unwrap()),
-        };
-
-        // The user data stored on the server to validate against
-        let user = UserData {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
-            totp_secret: Some(totp_secret),
         };
 
         // This login should work
@@ -171,18 +164,14 @@ mod test {
 
     #[test]
     fn test_validate_login_accept_no_totp() {
+        // The user data stored on the server to validate against
+        let user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
+            uuid: user.uuid.clone(),
             password: SUPER_SECRET_PASSWORD.to_owned(),
             totp: None,
-        };
-
-        // The user data stored on the server to validate against
-        let user = UserData {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
-            totp_secret: None,
         };
 
         // This login should work
@@ -193,18 +182,15 @@ mod test {
     fn test_validate_login_wrong_password() {
         let totp_secret = create_secret!();
 
+        // The user data stored on the server to validate against
+        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+        user.totp_secret = Some(totp_secret.clone());
+
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
+            uuid: user.uuid.clone(),
             password: String::from("wrong password"),
             totp: Some(get_code!(&totp_secret).unwrap()),
-        };
-
-        // The user data stored on the server to validate against
-        let user = UserData {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
-            totp_secret: Some(totp_secret),
         };
 
         // This login should not work
@@ -215,18 +201,15 @@ mod test {
     fn test_validate_login_missing_totp() {
         let totp_secret = create_secret!();
 
+        // The user data stored on the server to validate against
+        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+        user.totp_secret = Some(totp_secret.clone());
+
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
+            uuid: user.uuid.clone(),
             password: SUPER_SECRET_PASSWORD.to_owned(),
             totp: None,
-        };
-
-        // The user data stored on the server to validate against
-        let user = UserData {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
-            totp_secret: Some(totp_secret),
         };
 
         // This login should not work
@@ -237,18 +220,15 @@ mod test {
     fn test_validate_login_wrong_totp() {
         let totp_secret = create_secret!();
 
+        // The user data stored on the server to validate against
+        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+        user.totp_secret = Some(totp_secret.clone());
+
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
+            uuid: user.uuid.clone(),
             password: SUPER_SECRET_PASSWORD.to_owned(),
             totp: Some(String::from("42")),
-        };
-
-        // The user data stored on the server to validate against
-        let user = UserData {
-            uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
-            totp_secret: Some(totp_secret),
         };
 
         // This login should not work
