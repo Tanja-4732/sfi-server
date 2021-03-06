@@ -3,8 +3,9 @@ use crate::AppState;
 use super::types::User;
 use actix_web::{
     cookie::{Cookie, SameSite},
-    get, post, web, App, HttpResponse, HttpServer, Responder,
+    get, post, web, App, HttpMessage, HttpResponse, HttpServer, Responder,
 };
+use anyhow::Result;
 use argonautica::{Hasher, Verifier};
 use google_authenticator::GA_AUTH;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
@@ -22,6 +23,7 @@ use uuid::Uuid;
 // TODO improve these constants
 const SECRET_HASH_KEY: &'static str = "sneak 100";
 const TOTP_DISCREPANCY: u64 = 1;
+const JWT_SECRET: &'static str = "sneak 100";
 
 // A JWT should last five years
 const DURATION: u64 = 5 * 365 * 24 * 60 * 60;
@@ -30,6 +32,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     // Serve the static files of the frontend
     cfg.service(hello_auth)
         .service(handle_login)
+        .service(handle_status)
         .service(handle_signup);
 }
 
@@ -57,17 +60,9 @@ async fn handle_login(
         // Check credentials
         if validate_login(&credentials, &user) {
             // Authorize login
-            HttpResponse::Ok()
-                .cookie(
-                    Cookie::build("jwt", make_jwt(&user))
-                        .same_site(SameSite::Strict)
-                        .secure(true)
-                        .http_only(true)
-                        .finish(),
-                )
-                .body(json!({
-                    "uuid": user.uuid
-                }))
+            HttpResponse::Ok().cookie(bake_cookie(&user)).body(json!({
+                "uuid": user.uuid
+            }))
         } else {
             // Deny login
             HttpResponse::Unauthorized().body(json!({
@@ -103,15 +98,61 @@ async fn handle_signup(
     // Check user creation result
     if result.is_ok() {
         // Generate JWT and send success
-        HttpResponse::Ok().cookie(bake_cookie(&user)).body(json!({
-            "uuid": user.uuid
-        }))
+        HttpResponse::Ok()
+            .cookie(bake_cookie(&user))
+            .body(make_json_info(&user))
     } else {
         // Deny registration
-        HttpResponse::Unauthorized().body(json!({
+        HttpResponse::BadRequest().body(json!({
             "error": "Couldn't create account"
         }))
     }
+}
+
+#[get("/status")]
+async fn handle_status(data: web::Data<AppState>, req: web::HttpRequest) -> impl Responder {
+    // Get the JWT cookie (if any)
+    if let Some(jwt_cookie) = req.cookie("jwt") {
+        // Validate the JWT
+        if let Ok(uuid) = extract_uuid_from_jwt(jwt_cookie.value()) {
+            // Valid JWT, find user in projection
+            if let Some(user) = {
+                data.users
+                    .lock()
+                    .unwrap()
+                    .deref()
+                    .get_projection()
+                    .iter()
+                    .find(|user| user.uuid == uuid)
+                // Drop the mutex lock here
+            } {
+                // Inform the user about their login status
+                HttpResponse::Ok().body(make_json_info(&user))
+            } else {
+                // Report the missing entry in the projection
+                HttpResponse::InternalServerError().body(json!({
+                    "error": "Couldn't find user in projection"
+                }))
+            }
+        } else {
+            // Invalid JWT
+            HttpResponse::Unauthorized().body(json!({
+                "error": "Invalid credentials"
+            }))
+        }
+    } else {
+        // No JWT present
+        HttpResponse::Ok().body(json!({
+            "status": "Not logged in"
+        }))
+    }
+}
+
+fn make_json_info(user: &User) -> serde_json::Value {
+    json!({
+        "uuid": user.uuid,
+        "name": user.name
+    })
 }
 
 /// Generates the JWT authentication cookie
@@ -123,8 +164,18 @@ fn bake_cookie(user: &User) -> Cookie {
         .finish()
 }
 
-pub fn validate_jwt() {
-    todo!("Validate incoming JWTs placed on API requests")
+/// Extracts the UUID from a JWT (and validates it)
+pub fn extract_uuid_from_jwt(token: &str) -> Result<Uuid> {
+    Uuid::from_str(
+        &decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(JWT_SECRET.as_ref()),
+            &Validation::new(Algorithm::HS256),
+        )?
+        .claims
+        .sub,
+    )
+    .map_err(|uuid_error| anyhow::Error::from(uuid_error))
 }
 
 // TODO move this into sfi-core
@@ -170,7 +221,7 @@ fn make_jwt(user: &User) -> String {
     encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret("secret".as_ref()),
+        &EncodingKey::from_secret(JWT_SECRET.as_ref()),
     )
     .unwrap()
 }
