@@ -7,6 +7,7 @@ use argonautica::{Hasher, Verifier};
 use google_authenticator::GA_AUTH;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{
     str::FromStr,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -52,7 +53,9 @@ async fn handle_login(credentials: web::Json<UserLogin>) -> impl Responder {
                     .http_only(true)
                     .finish(),
             )
-            .body("Authentication successful")
+            .body(json!({
+                "uuid": user.uuid
+            }))
     } else {
         // Deny login
         HttpResponse::Unauthorized().body("Invalid credentials")
