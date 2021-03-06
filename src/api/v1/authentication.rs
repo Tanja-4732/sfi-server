@@ -11,7 +11,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use libocc::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sfi_core::types::{UserLogin, UserSignup};
+use sfi_core::types::{UserInfo, UserLogin, UserSignup};
 use std::{
     borrow::Borrow,
     ops::{Add, Deref, DerefMut},
@@ -33,6 +33,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(hello_auth)
         .service(handle_login)
         .service(handle_status)
+        .service(handle_logout)
         .service(handle_signup);
 }
 
@@ -60,9 +61,9 @@ async fn handle_login(
         // Check credentials
         if validate_login(&credentials, &user) {
             // Authorize login
-            HttpResponse::Ok().cookie(bake_cookie(&user)).body(json!({
-                "uuid": user.uuid
-            }))
+            HttpResponse::Ok()
+                .cookie(bake_cookie(&user))
+                .json(make_json_info(&user))
         } else {
             // Deny login
             HttpResponse::Unauthorized().body(json!({
@@ -100,7 +101,7 @@ async fn handle_signup(
         // Generate JWT and send success
         HttpResponse::Ok()
             .cookie(bake_cookie(&user))
-            .body(make_json_info(&user))
+            .json(make_json_info(&user))
     } else {
         // Deny registration
         HttpResponse::BadRequest().body(json!({
@@ -127,7 +128,7 @@ async fn handle_status(data: web::Data<AppState>, req: web::HttpRequest) -> impl
                 // Drop the mutex lock here
             } {
                 // Inform the user about their login status
-                HttpResponse::Ok().body(make_json_info(&user))
+                HttpResponse::Ok().json(make_json_info(&user))
             } else {
                 // Report the missing entry in the projection
                 HttpResponse::InternalServerError().body(json!({
@@ -148,11 +149,29 @@ async fn handle_status(data: web::Data<AppState>, req: web::HttpRequest) -> impl
     }
 }
 
-fn make_json_info(user: &User) -> serde_json::Value {
-    json!({
-        "uuid": user.uuid,
-        "name": user.name
-    })
+#[get("/logout")]
+async fn handle_logout(req: web::HttpRequest) -> impl Responder {
+    // Check for a JWT cookie
+    if let Some(_) = req.cookie("jwt") {
+        // Remove the cookie
+        HttpResponse::Ok()
+            .cookie(Cookie::build("jwt", "").path("/").finish())
+            .body(json!({
+                "status": "Logged out"
+            }))
+    } else {
+        // No JWT present
+        HttpResponse::BadRequest().body(json!({
+            "status": "Wasn't logged in"
+        }))
+    }
+}
+
+fn make_json_info(user: &User) -> UserInfo {
+    UserInfo {
+        uuid: user.uuid.clone(),
+        name: user.name.clone(),
+    }
 }
 
 /// Generates the JWT authentication cookie
