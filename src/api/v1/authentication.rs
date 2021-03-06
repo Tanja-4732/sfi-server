@@ -1,3 +1,5 @@
+use crate::AppState;
+
 use super::types::User;
 use actix_web::{
     cookie::{Cookie, SameSite},
@@ -6,17 +8,18 @@ use actix_web::{
 use argonautica::{Hasher, Verifier};
 use google_authenticator::GA_AUTH;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use libocc::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
+    borrow::Borrow,
+    ops::{Deref, DerefMut},
     str::FromStr,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use uuid::Uuid;
 
 // TODO improve these constants
-const SUPER_SECRET_PASSWORD: &'static str = "123";
-const USER_UUID: &'static str = "7a7e9c87-d745-4919-8343-9d44cf7de2eb";
 const SECRET_HASH_KEY: &'static str = "sneak 100";
 const TOTP_DISCREPANCY: u64 = 1;
 
@@ -25,7 +28,9 @@ const DURATION: u64 = 5 * 365 * 24 * 60 * 60;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Serve the static files of the frontend
-    cfg.service(hello_auth).service(handle_login);
+    cfg.service(hello_auth)
+        .service(handle_login)
+        .service(handle_signup);
 }
 
 #[get("")]
@@ -34,30 +39,102 @@ async fn hello_auth() -> impl Responder {
 }
 
 #[post("/login")]
-async fn handle_login(credentials: web::Json<UserLogin>) -> impl Responder {
-    // TODO implement some kind of user DB (using libocc)
-    let user = User::new("someone".to_owned(), credentials.password.clone());
-
-    // Check credentials
-    if validate_login(&credentials, &user) {
-        // Authorize login
-        HttpResponse::Ok()
-            .cookie(
-                Cookie::build("jwt", make_jwt(&user))
-                    .same_site(SameSite::Strict)
-                    .secure(true)
-                    .http_only(true)
-                    .finish(),
-            )
-            .body(json!({
-                "uuid": user.uuid
+async fn handle_login(
+    credentials: web::Json<UserLogin>,
+    data: web::Data<AppState>,
+) -> impl Responder {
+    // Try to find the specified user
+    if let Some(user) = {
+        data.users
+            .lock()
+            .unwrap()
+            .deref()
+            .get_projection()
+            .iter()
+            .find(|u| u.uuid == credentials.uuid)
+        // Drop the mutex lock here
+    } {
+        // Check credentials
+        if validate_login(&credentials, &user) {
+            // Authorize login
+            HttpResponse::Ok()
+                .cookie(
+                    Cookie::build("jwt", make_jwt(&user))
+                        .same_site(SameSite::Strict)
+                        .secure(true)
+                        .http_only(true)
+                        .finish(),
+                )
+                .body(json!({
+                    "uuid": user.uuid
+                }))
+        } else {
+            // Deny login
+            HttpResponse::Unauthorized().body(json!({
+                "error": "Invalid credentials"
             }))
+        }
     } else {
-        // Deny login
-        HttpResponse::Unauthorized().body("Invalid credentials")
+        // Report "no such user"
+        HttpResponse::NotFound().body(json!({
+            "error": "No such user"
+        }))
     }
 }
 
+#[post("/signup")]
+async fn handle_signup(
+    credentials: web::Json<UserSignup>,
+    data: web::Data<AppState>,
+) -> impl Responder {
+    // Make a new user
+    let user = User::new(credentials.name.clone(), credentials.password.clone());
+
+    // Try to insert into the event log
+    let result = {
+        data.users
+            .lock()
+            .unwrap()
+            .deref_mut()
+            .push(Event::create(user.clone()))
+        // Drop the mutex lock here
+    };
+
+    // Check user creation result
+    if result.is_ok() {
+        // Generate JWT and send success
+        HttpResponse::Ok().cookie(bake_cookie(&user)).body(json!({
+            "uuid": user.uuid
+        }))
+    } else {
+        // Deny registration
+        HttpResponse::Unauthorized().body(json!({
+            "error": "Couldn't create account"
+        }))
+    }
+}
+
+/// Generates the JWT authentication cookie
+fn bake_cookie(user: &User) -> Cookie {
+    Cookie::build("jwt", make_jwt(&user))
+        .same_site(SameSite::Strict)
+        .secure(true)
+        .http_only(true)
+        .finish()
+}
+
+pub fn validate_jwt() {
+    todo!("Validate incoming JWTs placed on API requests")
+}
+
+// TODO move this into sfi-core
+#[derive(Deserialize)]
+struct UserSignup {
+    name: String,
+    password: String,
+}
+
+// TODO move this into sfi-core
 #[derive(Deserialize)]
 struct UserLogin {
     uuid: Uuid,
@@ -141,7 +218,8 @@ pub fn make_salted_hash(password: String) -> String {
 mod test {
     use super::*;
     use google_authenticator::{create_secret, get_code};
-    use std::str::FromStr;
+
+    const SUPER_SECRET_PASSWORD: &'static str = "123";
 
     #[test]
     fn test_validate_login_accept() {

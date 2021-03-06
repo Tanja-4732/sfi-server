@@ -2,7 +2,11 @@ mod api;
 mod constants;
 mod static_files;
 
+use std::sync::Mutex;
+
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Resource, Responder};
+use api::v1::types::User;
+use libocc::Projector;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -14,8 +18,16 @@ async fn main() -> std::io::Result<()> {
         constants::license::license_notice_body()
     );
 
-    HttpServer::new(|| {
+    // Make an AppState-Mutex instance
+    let state = web::Data::new(AppState {
+        users: Mutex::new(Projector::new()),
+    });
+
+    // Make a new HttpServer instance using the factory in the closure below
+    HttpServer::new(move || {
         App::new()
+            // Apply the app state
+            .app_data(state.clone())
             // Mount the API
             .service(web::scope("/api").configure(api::config))
             // Mount the static files server
@@ -33,4 +45,8 @@ async fn serve_index() -> impl Responder {
     HttpResponse::Ok()
         .header("X-sfi-server-version", constants::meta::VERSION)
         .body(std::fs::read("../sfi-web/public/index.html").unwrap())
+}
+
+pub struct AppState {
+    pub users: Mutex<Projector<User>>,
 }
