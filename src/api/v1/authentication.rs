@@ -161,7 +161,7 @@ mod test {
         // The user data stored on the server to validate against
         let user = UserData {
             uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD),
+            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
             totp_secret: Some(totp_secret),
         };
 
@@ -181,7 +181,7 @@ mod test {
         // The user data stored on the server to validate against
         let user = UserData {
             uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD),
+            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
             totp_secret: None,
         };
 
@@ -203,7 +203,7 @@ mod test {
         // The user data stored on the server to validate against
         let user = UserData {
             uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD),
+            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
             totp_secret: Some(totp_secret),
         };
 
@@ -225,7 +225,7 @@ mod test {
         // The user data stored on the server to validate against
         let user = UserData {
             uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD),
+            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
             totp_secret: Some(totp_secret),
         };
 
@@ -247,7 +247,7 @@ mod test {
         // The user data stored on the server to validate against
         let user = UserData {
             uuid: Uuid::from_str(USER_UUID).unwrap(),
-            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD),
+            pwd_salt_hash: make_salted_hash(SUPER_SECRET_PASSWORD.to_owned()),
             totp_secret: Some(totp_secret),
         };
 
