@@ -1,6 +1,5 @@
-use crate::AppState;
-
 use super::types::User;
+use crate::AppState;
 use actix_web::{
     cookie::{Cookie, SameSite},
     get, post, web, App, HttpMessage, HttpResponse, HttpServer, Responder,
@@ -12,9 +11,10 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use libocc::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sfi_core::types::{UserLogin, UserSignup};
 use std::{
     borrow::Borrow,
-    ops::{Deref, DerefMut},
+    ops::{Add, Deref, DerefMut},
     str::FromStr,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -161,6 +161,8 @@ fn bake_cookie(user: &User) -> Cookie {
         .same_site(SameSite::Strict)
         .secure(true)
         .http_only(true)
+        .permanent()
+        .path("/")
         .finish()
 }
 
@@ -176,21 +178,6 @@ pub fn extract_uuid_from_jwt(token: &str) -> Result<Uuid> {
         .sub,
     )
     .map_err(|uuid_error| anyhow::Error::from(uuid_error))
-}
-
-// TODO move this into sfi-core
-#[derive(Deserialize)]
-struct UserSignup {
-    name: String,
-    password: String,
-}
-
-// TODO move this into sfi-core
-#[derive(Deserialize)]
-struct UserLogin {
-    uuid: Uuid,
-    password: String,
-    totp: Option<String>,
 }
 
 /// Our claims struct, it needs to derive `Serialize` and/or `Deserialize`

@@ -2031,6 +2031,13 @@ dependencies = [
 [[package]]
 name = "sfi-core"
 version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "libocc",
+ "serde",
+ "serde_derive",
+ "uuid",
+]
 
 [[package]]
 name = "sfi-server"
