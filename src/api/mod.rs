@@ -3,7 +3,7 @@
 pub mod v1;
 
 use crate::constants;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, web, HttpResponse, Responder};
 use serde_json::json;
 
 pub fn config(cfg: &mut web::ServiceConfig) {

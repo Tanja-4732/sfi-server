@@ -1,12 +1,10 @@
 mod api;
 mod constants;
 mod static_files;
-
-use std::sync::Mutex;
-
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Resource, Responder};
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use api::v1::types::User;
 use libocc::Projector;
+use std::sync::Mutex;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

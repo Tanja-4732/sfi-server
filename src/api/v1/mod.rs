@@ -1,11 +1,10 @@
 //! This is the first version of the sfi-server API
 
 mod authentication;
-mod authorization;
 mod client_events;
 pub mod types;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, web, HttpResponse, Responder};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Serve the static files of the frontend

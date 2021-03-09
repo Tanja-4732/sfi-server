@@ -2,7 +2,7 @@ use super::types::User;
 use crate::AppState;
 use actix_web::{
     cookie::{Cookie, SameSite},
-    get, post, web, App, HttpMessage, HttpResponse, HttpServer, Responder,
+    get, post, web, HttpMessage, HttpResponse, Responder,
 };
 use anyhow::anyhow;
 use anyhow::Result;
@@ -14,10 +14,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sfi_core::types::{UserIdentifier, UserInfo, UserLogin, UserSignup};
 use std::{
-    borrow::Borrow,
-    ops::{Add, Deref, DerefMut},
+    ops::{Deref, DerefMut},
     str::FromStr,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use uuid::Uuid;
 
@@ -294,7 +293,7 @@ mod test {
 
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: user.uuid.clone(),
+            identifier: UserIdentifier::Uuid(user.uuid.clone()),
             password: SUPER_SECRET_PASSWORD.to_owned(),
             totp: Some(get_code!(&totp_secret).unwrap()),
         };
@@ -310,7 +309,7 @@ mod test {
 
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: user.uuid.clone(),
+            identifier: UserIdentifier::Uuid(user.uuid.clone()),
             password: SUPER_SECRET_PASSWORD.to_owned(),
             totp: None,
         };
@@ -329,7 +328,7 @@ mod test {
 
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: user.uuid.clone(),
+            identifier: UserIdentifier::Uuid(user.uuid.clone()),
             password: String::from("wrong password"),
             totp: Some(get_code!(&totp_secret).unwrap()),
         };
@@ -348,7 +347,7 @@ mod test {
 
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: user.uuid.clone(),
+            identifier: UserIdentifier::Uuid(user.uuid.clone()),
             password: SUPER_SECRET_PASSWORD.to_owned(),
             totp: None,
         };
@@ -367,7 +366,7 @@ mod test {
 
         // The credentials to attempt authentication with
         let credentials = UserLogin {
-            uuid: user.uuid.clone(),
+            identifier: UserIdentifier::Uuid(user.uuid.clone()),
             password: SUPER_SECRET_PASSWORD.to_owned(),
             totp: Some(String::from("42")),
         };
