@@ -4,6 +4,7 @@ use actix_web::{
     cookie::{Cookie, SameSite},
     get, post, web, App, HttpMessage, HttpResponse, HttpServer, Responder,
 };
+use anyhow::anyhow;
 use anyhow::Result;
 use argonautica::{Hasher, Verifier};
 use google_authenticator::GA_AUTH;
@@ -11,7 +12,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use libocc::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sfi_core::types::{UserInfo, UserLogin, UserSignup};
+use sfi_core::types::{UserIdentifier, UserInfo, UserLogin, UserSignup};
 use std::{
     borrow::Borrow,
     ops::{Add, Deref, DerefMut},
@@ -47,16 +48,17 @@ async fn handle_login(
     credentials: web::Json<UserLogin>,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    // Try to find the specified user
+    // Get a lock on the mutex
+    let lock = data.users.lock().unwrap();
+
     if let Some(user) = {
-        data.users
-            .lock()
-            .unwrap()
-            .deref()
-            .get_projection()
-            .iter()
-            .find(|u| u.uuid == credentials.uuid)
-        // Drop the mutex lock here
+        let mut user_iter = lock.deref().get_projection().iter();
+
+        // Try to find the specified user
+        match &credentials.identifier {
+            UserIdentifier::Name(name) => user_iter.find(|u| u.name == *name),
+            UserIdentifier::Uuid(uuid) => user_iter.find(|u| u.uuid == *uuid),
+        }
     } {
         // Check credentials
         if validate_login(&credentials, &user) {
@@ -86,13 +88,17 @@ async fn handle_signup(
     // Make a new user
     let user = User::new(credentials.name.clone(), credentials.password.clone());
 
-    // Try to insert into the event log
     let result = {
-        data.users
-            .lock()
-            .unwrap()
-            .deref_mut()
-            .push(Event::create(user.clone()))
+        // Lock the mutex
+        let mut projector = data.users.lock().unwrap();
+
+        // Check for a name collision
+        if resolve_name(&credentials.name, projector.deref().get_projection()).is_some() {
+            Err(anyhow!("Name taken"))
+        } else {
+            // Try to insert into the event log
+            projector.deref_mut().push(Event::create(user.clone()))
+        }
         // Drop the mutex lock here
     };
 
@@ -234,11 +240,6 @@ fn make_jwt(user: &User) -> String {
 
 /// Authenticates a user based on credentials
 fn validate_login(credentials: &UserLogin, user: &User) -> bool {
-    // Make sure to authenticate the correct user
-    if credentials.uuid != user.uuid {
-        return false;
-    }
-
     // Check if a TOTP exists
     if let Some(secret) = &user.totp_secret {
         // If a TOTP secret is present, check for a valid TOTP code
@@ -269,6 +270,11 @@ pub fn make_salted_hash(password: String) -> String {
         .with_secret_key(SECRET_HASH_KEY)
         .hash()
         .unwrap()
+}
+
+/// Resolves a name to a user instance
+pub fn resolve_name<'a>(name: &'a str, projection: &'a Vec<User>) -> Option<&'a User> {
+    projection.iter().find(|u| u.name == name)
 }
 
 #[cfg(test)]
