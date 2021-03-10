@@ -888,6 +888,7 @@ checksum = "7f55667319111d593ba876406af7c409c0ebb44dc4be6132a783ccf163ea14c1"
 dependencies = [
  "futures-channel",
  "futures-core",
+ "futures-executor",
  "futures-io",
  "futures-sink",
  "futures-task",
@@ -918,6 +919,17 @@ checksum = "ab90cde24b3319636588d0c35fe03b1333857621051837ed769faefb4c2162e4"
 dependencies = [
  "futures 0.1.31",
  "num_cpus",
+]
+
+[[package]]
+name = "futures-executor"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "891a4b7b96d84d5940084b2a37632dd65deeae662c114ceaa2c879629c9c0ad1"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
 ]
 
 [[package]]
@@ -2044,10 +2056,12 @@ name = "sfi-server"
 version = "0.0.0"
 dependencies = [
  "actix-files",
+ "actix-service",
  "actix-web",
  "anyhow",
  "argonautica",
  "chrono",
+ "futures 0.3.13",
  "google-authenticator",
  "jsonwebtoken",
  "libocc",
