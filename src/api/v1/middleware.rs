@@ -19,13 +19,13 @@ use libocc::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sfi_core::types::{UserIdentifier, UserInfo, UserLogin, UserSignup};
-use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{
     ops::{Deref, DerefMut},
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
+use std::{pin::Pin, rc::Rc};
 use uuid::Uuid;
 
 // There are two steps in middleware processing.
@@ -83,6 +83,9 @@ where
             if let Ok(uuid) = extract_uuid_from_jwt(jwt_cookie.value()) {
                 // Keep processing the request
                 println!("Continue with UUID: {:?}", &uuid);
+
+                req.extensions_mut().deref_mut().insert(uuid);
+
                 Either::Left(self.service.call(req))
             } else {
                 // Invalid JWT
