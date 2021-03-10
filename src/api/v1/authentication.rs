@@ -24,6 +24,7 @@ use uuid::Uuid;
 const SECRET_HASH_KEY: &'static str = "sneak 100";
 const TOTP_DISCREPANCY: u64 = 1;
 const JWT_SECRET: &'static str = "sneak 100";
+const USE_SECURE_COOKIE: bool = false;
 
 // A JWT should last five years
 const DURATION: u64 = 5 * 365 * 24 * 60 * 60;
@@ -183,7 +184,7 @@ fn make_json_info(user: &User) -> UserInfo {
 fn bake_cookie(user: &User) -> Cookie {
     Cookie::build("jwt", make_jwt(&user))
         .same_site(SameSite::Strict)
-        .secure(true)
+        .secure(USE_SECURE_COOKIE)
         .http_only(true)
         .permanent()
         .path("/")
