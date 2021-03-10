@@ -1,32 +1,15 @@
-use super::{authentication::extract_uuid_from_jwt, types::User};
-use crate::AppState;
+use super::authentication::extract_uuid_from_jwt;
 use actix_service::{Service, Transform};
-use actix_web::{
-    cookie::{Cookie, SameSite},
-    get, post, web, HttpMessage, HttpResponse, Responder,
-};
 use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error};
-use anyhow::anyhow;
+use actix_web::{HttpMessage, HttpResponse};
 use anyhow::Result;
-use argonautica::{Hasher, Verifier};
 use futures::{
     future::{ok, Either, Ready},
     Future,
 };
-use google_authenticator::GA_AUTH;
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use libocc::Event;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use sfi_core::types::{UserIdentifier, UserInfo, UserLogin, UserSignup};
+use std::ops::DerefMut;
+use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{
-    ops::{Deref, DerefMut},
-    str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
-};
-use std::{pin::Pin, rc::Rc};
-use uuid::Uuid;
 
 // There are two steps in middleware processing.
 // 1. Middleware initialization, middleware factory gets called with
@@ -81,21 +64,20 @@ where
         let res = if let Some(jwt_cookie) = req.cookie("jwt") {
             // Validate the JWT
             if let Ok(uuid) = extract_uuid_from_jwt(jwt_cookie.value()) {
-                // Keep processing the request
-                println!("Continue with UUID: {:?}", &uuid);
-
+                // Insert the UUID into the request
                 req.extensions_mut().deref_mut().insert(uuid);
 
+                // Keep processing the request
                 Either::Left(self.service.call(req))
             } else {
                 // Invalid JWT
 
+                // TODO return custom body
                 // HttpResponse::Unauthorized().finish().body(json!({
                 //     "error": "Invalid credentials"
                 // }))
 
-                println!("Invalid JWT: {:?}", &jwt_cookie);
-
+                // Return unauthorized
                 Either::Right(ok(
                     req.into_response(HttpResponse::Unauthorized().finish().into_body())
                 ))
@@ -103,12 +85,12 @@ where
         } else {
             // No JWT present
 
+            // TODO return custom body
             // HttpResponse::Unauthorized().body(json!({
             //     "status": "Not logged in"
             // }))
 
-            println!("Missing JWT");
-
+            // Return unauthorized
             Either::Right(ok(
                 req.into_response(HttpResponse::Unauthorized().finish().into_body())
             ))
@@ -118,7 +100,6 @@ where
     }
 
     // fn call_a(&mut self, req: ServiceRequest) -> Self::Future {
-    //     println!("Hi from start. You requested: {}", req.path());
 
     //     // Auth start
     //     // Get the JWT cookie (if any)
@@ -128,7 +109,6 @@ where
     //             // Keep processing the request
     //             let res = self.service.call(req);
 
-    //             println!("Hi from response");
     //             ok(res)
     //         } else {
     //             // Invalid JWT
