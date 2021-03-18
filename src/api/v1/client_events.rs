@@ -23,3 +23,18 @@ async fn hello_events(req: web::HttpRequest) -> impl Responder {
         HttpResponse::InternalServerError().finish().into_body()
     }
 }
+
+#[get("/{inventory_uuid}")]
+async fn handle_get_event(
+    req: web::HttpRequest,
+    web::Path(inventory_uuid): web::Path<Uuid>,
+) -> impl Responder {
+    if let Some(user_uuid) = req.extensions().deref().get::<Uuid>() {
+        // TODO Get a lock on the mutex
+        // let lock = data.inventories;
+
+        HttpResponse::Ok().body(String::new())
+    } else {
+        HttpResponse::InternalServerError().finish().into_body()
+    }
+}
