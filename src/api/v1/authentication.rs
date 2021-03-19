@@ -12,8 +12,9 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use libocc::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sfi_core::types::{UserIdentifier, UserInfo, UserLogin, UserSignup};
+use sfi_core::users::{UserIdentifier, UserInfo, UserLogin, UserSignup};
 use std::{
+    borrow::Cow,
     ops::{Deref, DerefMut},
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
@@ -46,7 +47,7 @@ async fn hello_auth() -> impl Responder {
 #[post("/login")]
 async fn handle_login(
     credentials: web::Json<UserLogin>,
-    data: web::Data<AppState>,
+    data: web::Data<AppState<'_>>,
 ) -> impl Responder {
     // Get a lock on the mutex
     let lock = data.users.lock().unwrap();
@@ -83,41 +84,49 @@ async fn handle_login(
 #[post("/signup")]
 async fn handle_signup(
     credentials: web::Json<UserSignup>,
-    data: web::Data<AppState>,
+    data: web::Data<AppState<'_>>,
 ) -> impl Responder {
     // Make a new user
-    let user = User::new(credentials.name.clone(), credentials.password.clone());
+    if let Ok(user) = User::new(credentials.name.clone(), credentials.password.clone()) {
+        let result = {
+            // Lock the mutex
+            let mut projector = data.users.lock().unwrap();
 
-    let result = {
-        // Lock the mutex
-        let mut projector = data.users.lock().unwrap();
+            // Check for a name collision
+            if resolve_name(&credentials.name, projector.deref().get_projection()).is_some() {
+                Err(anyhow!("Name taken"))
+            } else {
+                // Try to insert into the event log
+                projector
+                    .deref_mut()
+                    // TODO reorganize and replace clone with move
+                    .push(Event::create(Cow::Owned(user.clone())))
+            }
+            // Drop the mutex lock here
+        };
 
-        // Check for a name collision
-        if resolve_name(&credentials.name, projector.deref().get_projection()).is_some() {
-            Err(anyhow!("Name taken"))
+        // Check user creation result
+        if result.is_ok() {
+            // Generate JWT and send success
+            HttpResponse::Ok()
+                .cookie(bake_cookie(&user))
+                .json(make_json_info(&user))
         } else {
-            // Try to insert into the event log
-            projector.deref_mut().push(Event::create(user.clone()))
+            // Deny registration
+            HttpResponse::BadRequest().body(json!({
+                "error": "Couldn't create account"
+            }))
         }
-        // Drop the mutex lock here
-    };
-
-    // Check user creation result
-    if result.is_ok() {
-        // Generate JWT and send success
-        HttpResponse::Ok()
-            .cookie(bake_cookie(&user))
-            .json(make_json_info(&user))
     } else {
         // Deny registration
         HttpResponse::BadRequest().body(json!({
-            "error": "Couldn't create account"
+            "error": "Need a password"
         }))
     }
 }
 
 #[get("/status")]
-async fn handle_status(data: web::Data<AppState>, req: web::HttpRequest) -> impl Responder {
+async fn handle_status(data: web::Data<AppState<'_>>, req: web::HttpRequest) -> impl Responder {
     // Get the JWT cookie (if any)
     if let Some(jwt_cookie) = req.cookie("jwt") {
         // Validate the JWT
@@ -264,16 +273,18 @@ fn validate_login(credentials: &UserLogin, user: &User) -> bool {
 }
 
 /// Generates some nice salt
-pub fn make_salted_hash(password: String) -> String {
+pub fn make_salted_hash(password: String) -> Result<String, argonautica::Error> {
     Hasher::new()
         .with_password(&password)
         .with_secret_key(SECRET_HASH_KEY)
         .hash()
-        .unwrap()
 }
 
 /// Resolves a name to a user instance
-pub fn resolve_name<'a>(name: &'a str, projection: &'a Vec<User>) -> Option<&'a User> {
+pub fn resolve_name<'a>(
+    name: &'a str,
+    projection: &'a Vec<Cow<User>>,
+) -> Option<&'a Cow<'a, User>> {
     projection.iter().find(|u| u.name == name)
 }
 
@@ -289,7 +300,7 @@ mod test {
         let totp_secret = create_secret!();
 
         // The user data stored on the server to validate against
-        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned()).unwrap();
         user.totp_secret = Some(totp_secret.clone());
 
         // The credentials to attempt authentication with
@@ -306,7 +317,7 @@ mod test {
     #[test]
     fn test_validate_login_accept_no_totp() {
         // The user data stored on the server to validate against
-        let user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+        let user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned()).unwrap();
 
         // The credentials to attempt authentication with
         let credentials = UserLogin {
@@ -324,7 +335,7 @@ mod test {
         let totp_secret = create_secret!();
 
         // The user data stored on the server to validate against
-        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned()).unwrap();
         user.totp_secret = Some(totp_secret.clone());
 
         // The credentials to attempt authentication with
@@ -343,7 +354,7 @@ mod test {
         let totp_secret = create_secret!();
 
         // The user data stored on the server to validate against
-        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned()).unwrap();
         user.totp_secret = Some(totp_secret.clone());
 
         // The credentials to attempt authentication with
@@ -362,7 +373,7 @@ mod test {
         let totp_secret = create_secret!();
 
         // The user data stored on the server to validate against
-        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned());
+        let mut user = User::new("someone".to_owned(), SUPER_SECRET_PASSWORD.to_owned()).unwrap();
         user.totp_secret = Some(totp_secret.clone());
 
         // The credentials to attempt authentication with

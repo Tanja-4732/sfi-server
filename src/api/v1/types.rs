@@ -13,13 +13,13 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(name: String, password: String) -> Self {
-        Self {
+    pub fn new(name: String, password: String) -> Result<Self, argonautica::Error> {
+        Ok(Self {
             uuid: Uuid::new_v4(),
             name,
-            pwd_salt_hash: make_salted_hash(password),
+            pwd_salt_hash: make_salted_hash(password)?,
             totp_secret: None,
-        }
+        })
     }
 }
 

@@ -16,7 +16,7 @@ description = "Manage shared food inventories (backend server)"
 [dependencies]
 # Core libs
 sfi-core = { path = "../sfi-core", version = "0" }
-libocc = { path = "../libocc-rs", version = "0.4" }
+libocc = { path = "../libocc-rs", version = "0.5" }
 
 # Actix
 actix-web = "3"
