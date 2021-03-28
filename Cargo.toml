@@ -38,3 +38,4 @@ anyhow = "1.0.38"
 jsonwebtoken = "7"
 argonautica = { version = "0.2.0", features = ["simd"] }
 google-authenticator = "0.2"
+lazy_static = "1.4"

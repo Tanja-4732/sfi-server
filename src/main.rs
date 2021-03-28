@@ -1,11 +1,10 @@
 mod api;
 mod constants;
+mod state;
 mod static_files;
+
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use api::v1::types::User;
-use libocc::Projector;
-use sfi_core::store::Store;
-use std::sync::Mutex;
+use state::get_app_state;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -18,10 +17,7 @@ async fn main() -> std::io::Result<()> {
     );
 
     // Make an AppState-Mutex instance
-    let state = web::Data::new(AppState {
-        users: Mutex::new(Projector::new()),
-        inventories: Mutex::new(Store::new()),
-    });
+    let state = get_app_state();
 
     // Make a new HttpServer instance using the factory in the closure below
     HttpServer::new(move || {
@@ -45,9 +41,4 @@ async fn serve_index() -> impl Responder {
     HttpResponse::Ok()
         .header("X-sfi-server-version", constants::meta::VERSION)
         .body(std::fs::read("../sfi-web/public/index.html").unwrap())
-}
-
-pub struct AppState<'a> {
-    pub users: Mutex<Projector<'a, User>>,
-    pub inventories: Mutex<Store<'a>>,
 }

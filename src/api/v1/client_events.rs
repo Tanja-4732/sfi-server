@@ -1,13 +1,12 @@
 //! This file handles API calls related to client-side event sourcing using sfi-core
 
+use crate::state::AppState;
 use actix_web::{get, web, HttpResponse, Responder};
 use libocc::Timestamp;
 use serde_json::json;
 use sfi_core;
 use std::ops::Deref;
 use uuid::Uuid;
-
-use crate::AppState;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Serve the static files of the frontend

@@ -1,5 +1,5 @@
 use super::types::User;
-use crate::AppState;
+use crate::state::{persist_users, AppState};
 use actix_web::{
     cookie::{Cookie, SameSite},
     get, post, web, HttpMessage, HttpResponse, Responder,
@@ -97,11 +97,17 @@ async fn handle_signup(
                 Err(anyhow!("Name taken"))
             } else {
                 // Try to insert into the event log
-                projector
+                let res = projector
                     .deref_mut()
                     // TODO reorganize and replace clone with move
-                    .push(Event::create(Cow::Owned(user.clone())))
+                    .push(Event::create(Cow::Owned(user.clone())));
+
+                // TODO handle this result
+                persist_users(&projector);
+
+                res
             }
+
             // Drop the mutex lock here
         };
 
