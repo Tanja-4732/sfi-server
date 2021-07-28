@@ -2,9 +2,8 @@
 
 use crate::state::AppState;
 use actix_web::{get, web, HttpResponse, Responder};
-use libocc::Timestamp;
 use serde_json::json;
-use sfi_core;
+use sfi_core::Timestamp;
 use std::ops::Deref;
 use uuid::Uuid;
 

@@ -9,10 +9,10 @@ use anyhow::Result;
 use argonautica::{Hasher, Verifier};
 use google_authenticator::GA_AUTH;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use libocc::Event;
+use libocc::events::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sfi_core::users::{UserIdentifier, UserInfo, UserLogin, UserSignup};
+use sfi_core::core::users::{UserIdentifier, UserInfo, UserLogin, UserSignup};
 use std::{
     borrow::Cow,
     ops::{Deref, DerefMut},

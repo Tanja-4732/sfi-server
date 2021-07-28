@@ -2,9 +2,9 @@ use crate::api::v1::types::User;
 use actix_web::web;
 use anyhow::Result;
 use lazy_static::lazy_static;
-use libocc::Projector;
+use libocc::events::Projector;
 use serde::{Deserialize, Serialize};
-use sfi_core::store::Store;
+use sfi_core::events::store::Store;
 use std::{fmt::format, fs, sync::Mutex};
 
 fn get_pwd() -> String {
